@@ -1,35 +1,49 @@
 #!/usr/bin/env ruby
 
 # TODO write to output file
-# TODO tabs vs space consistency
-# TODO other useful things
+
+# Wonky bug in rinruby (see http://hfeild-software.blogspot.com/2013/01/rinruby-woes.html)
+# I will send a PR to get it fixed sometime in the future
+
+R = ""
 
 module Utils
     def self.print_usage
-        puts "./metadaer.rb <pyerr|pylog|bgdist> <param,param,...> <files>"
+        puts "primord-metadata <directive> ...\n\tSee https://github.com/floomby/primord-tools for more info"
     end
-    def self.count_lines file
-        lines = 0
-        file.each_line { |l| lines += 1 }
-        file.rewind
-        lines
-    end
+    # get date the file was created from the filename
     def self.extract_date str
         a = str.match /.*([0-9]{4})([0-9]{2})([0-9]{2})/
         "#{a[2]}-#{a[3]}-#{a[1]}"
     end
-end # class Stuff
+end # class Utils
 
-# classes for each type of file we want to
-# work with
+# classes for each type of file we want to work with
 class DataFile
     @@params
     def initialize filename
+        @filename = filename
         @data = {}
-        @data['file'] = filename
-        @file = File.open filename, 'r'
-
+        @lines = IO.readlines @filename
+        
+        # generic stuff that all files can have
+        def self.data_file
+            @data['file'] = @filename
+        end
+        def self.data_lines
+            @data['lines'] = @lines.length
+        end
+        def self.data_date
+            @data['date'] = Utils::extract_date @filename
+        end
+        
+        # all the computation happens here
         def self.write
+            # fill out @data
+            @@params.each do |param|
+                self.send "data_#{param}"
+            end
+            # write everything out to stdout
             str = ""
             @@params.each do |param|
                 str += "#{@data[param]},"
@@ -37,6 +51,7 @@ class DataFile
             puts str[0..-2]
         end
     end
+    # set @@params and write the csv header
     def self.format= params
         @@params = params
         str = ""
@@ -44,36 +59,78 @@ class DataFile
             str += "#{param},"
         end
         puts str[0..-2]
+
+        # check if we need to do the statistical modeling
+        @@do_stats = false
+        @@params.each do |param|
+            if param.match /^stat_/
+                @@do_stats = true
+                require 'rinruby'
+                # NOTE not even close to threadsafe
+                @@r = RinRuby.new({:interactive=>false, :echo=>true})
+                @@r.eval 'library(pscl)'
+                break
+            end
+        end
     end
 end
 
 class Pyerr < DataFile
     def initialize filename
         super
-        # count the lines
-        @data['lines'] = Utils::count_lines @file
-        # get the date		
-        @data['date'] = Utils::extract_date filename
+        # nothing special
     end
 end # class DataFile
 
 class Pylog < DataFile
     def initialize filename
         super
-        # count the lines
-        @data['lines'] = Utils::count_lines @file
-        # get the date		
-        @data['date'] = Utils::extract_date filename
+        # nothing special
     end
 end # class Pylog
 
 class Bgdist < DataFile
     def initialize filename
         super
-        # count the lines
-        @data['lines'] = Utils::count_lines @file
-        # get the date		
-        @data['date'] = Utils::extract_date filename
+        
+        def self.data_has_multi
+            if @lines[0].match /bin,avg_amp,N_avg_amp,,freq,N_freq/
+                @data['has_multi'] = false
+            elsif @lines[0].match /bin,avg_amp_sf,N_avg_amp_sf,N_avg_amp_mf,,freq,N_freq_sf,N_freq_mf/
+                @data['has_multi'] = true
+            else
+                abort "\nerror in comprehending bgdist header: #{@lines[0]}\n"
+            end
+        end
+        
+        if @@do_stats
+rcode = <<EOF
+    D <- read.csv('#{@filename}')
+    D <- D[1:length(D$bin)-1,]
+EOF
+            self.data_has_multi
+            if @data['has_multi']
+                abort 'multi frequency unsuported'
+            else
+rcode += <<EOF
+    mod.sf <- tryCatch({
+        zeroinfl(D$N_avg_amp ~ bin, data=D, dist="poisson")
+    }, warning = function(w) {
+        write(paste("fitting warning: ",w), stderr())
+    }, error = function(e) {
+        write(paste("fitting error: ",e), stderr())
+    }, finally = {
+        # everything is fine
+    })
+EOF
+            end
+            
+            @@r.eval rcode
+        end
+        
+        def self.data_stat_test
+            @data['stat_test'] = 'test'
+        end
     end
 end # class BGdist
 
@@ -84,18 +141,16 @@ case directive
 when 'help'
     Utils::print_usage
     exit 0
-else
+when 'metadata'
+    clas = Object.const_get ARGV.shift.capitalize
     params = []
     ARGV.shift.gsub(/([^,]+)/){ |p| params << p }
     DataFile::format = params
-    clas = Object.const_get directive.capitalize
+else
+    puts 'unknown directive'
 end
 
-objs = []
 ARGV.each do |filename|
-    objs << (clas.new filename)
-end
-
-objs.each do |obj|
+    obj = clas.new filename
     obj.write
 end

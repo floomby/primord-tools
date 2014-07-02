@@ -67,7 +67,7 @@ class DataFile
                 @@do_stats = true
                 require 'rinruby'
                 # NOTE not even close to threadsafe
-                @@r = RinRuby.new({:interactive=>false, :echo=>true})
+                @@r = RinRuby.new :interactive => false, :echo => true, :executable => "'#{`which R`.chomp.chomp}'"
                 @@r.eval 'library(pscl)'
                 break
             end

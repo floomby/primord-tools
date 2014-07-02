@@ -21,6 +21,8 @@ end # class Utils
 # classes for each type of file we want to work with
 class DataFile
     @@params
+    @@outfile
+    @@logfile
     def initialize filename
         @filename = filename
         @data = {}
@@ -48,27 +50,28 @@ class DataFile
             @@params.each do |param|
                 str += "#{@data[param]},"
             end
-            puts str[0..-2]
+            @@outfile.puts str[0..-2]
         end
     end
     # set @@params and write the csv header
-    def self.format= params
+    def self.format params, outfile
+        @@outfile = outfile
         @@params = params
         str = ""
         @@params.each do |param|
             str += "#{param},"
         end
-        puts str[0..-2]
+        @@outfile.puts str[0..-2]
 
         # check if we need to do the statistical modeling
         @@do_stats = false
         @@params.each do |param|
-            if param.match /^stat_/
+            if param =~ /^stat_/
                 @@do_stats = true
                 require 'rinruby'
                 # NOTE not even close to threadsafe
-                @@r = RinRuby.new :interactive => false, :echo => true, :executable => "'#{`which R`.chomp.chomp}'"
-                @@r.eval 'library(pscl)'
+                @@R = RinRuby.new :interactive => false, :echo => true, :executable => "'#{`which R`.chomp.chomp}'"
+                @@R.eval 'library(pscl)'
                 break
             end
         end
@@ -94,9 +97,9 @@ class Bgdist < DataFile
         super
         
         def self.data_has_multi
-            if @lines[0].match /bin,avg_amp,N_avg_amp,,freq,N_freq/
+            if @lines[0] =~ /bin,avg_amp,N_avg_amp,,freq,N_freq/
                 @data['has_multi'] = false
-            elsif @lines[0].match /bin,avg_amp_sf,N_avg_amp_sf,N_avg_amp_mf,,freq,N_freq_sf,N_freq_mf/
+            elsif @lines[0] =~ /bin,avg_amp_sf,N_avg_amp_sf,N_avg_amp_mf,,freq,N_freq_sf,N_freq_mf/
                 @data['has_multi'] = true
             else
                 abort "\nerror in comprehending bgdist header: #{@lines[0]}\n"
@@ -105,31 +108,76 @@ class Bgdist < DataFile
         
         if @@do_stats
 rcode = <<EOF
+    print_log <- function (what, msg)
+    {
+        print(paste("#{@filename}:", what, " -> ", msg), stdout());
+    }
+    
     D <- read.csv('#{@filename}')
     D <- D[1:length(D$bin)-1,]
 EOF
             self.data_has_multi
             if @data['has_multi']
-                abort 'multi frequency unsuported'
-            else
+rcode += <<EOF
+    mod.sf <- tryCatch({
+        zeroinfl(D$N_avg_amp_sf ~ bin, data=D, dist="poisson")
+    }, warning = function(w) {
+        print_log("fitting single frequency", w)
+    }, error = function(e) {
+        print_log("fitting single frequency", e)
+    }, finally = {})
+    
+    mod.mf <- tryCatch({
+        zeroinfl(D$N_avg_amp_mf ~ bin, data=D, dist="poisson")
+    }, warning = function(w) {
+        print_log("fitting multi frequency", w)
+    }, error = function(e) {
+        print_log("fitting multi frequency", e)
+    }, finally = {
+    })
+EOF
+            else # single frequency
 rcode += <<EOF
     mod.sf <- tryCatch({
         zeroinfl(D$N_avg_amp ~ bin, data=D, dist="poisson")
     }, warning = function(w) {
-        write(paste("fitting warning: ",w), stderr())
+        print_log("fitting single frequency", w)
     }, error = function(e) {
-        write(paste("fitting error: ",e), stderr())
-    }, finally = {
-        # everything is fine
-    })
+        print_log("fitting single frequency", e)
+    }, finally = {})
+    mod.mf = NA
 EOF
-            end
-            
-            @@r.eval rcode
+            end # end of single or multifrequency block
+            # rinruby does not support the logical type, thus we use NaN which is a double
+rcode += <<EOF
+    if (typeof(mod.sf) == "list") {
+        mod.sf_aic = AIC(mod.sf)
+        mod.sf_intercept = mod.sf$intercept
+    } else {
+        mod.sf_aic = NaN
+        mod.sf_intercept = NaN
+    }
+    if (typeof(mod.mf) == "list") {
+        mod.mf_aic = AIC(mod.mf)
+        mod.mf_intercept = mod.mf$intercept
+    } else {
+        mod.mf_aic = NaN
+        mod.mf_intercept = NaN
+    }
+EOF
+            @@R.eval rcode
         end
         
-        def self.data_stat_test
-            @data['stat_test'] = 'test'
+        # ruby metaprograming :P
+        def self.method_missing m, *args, &block
+            if m =~ /^data_(stat_)(.*)/
+                @data["#{$1}#{$2}"] = @@R.send "mod.#{$2}"
+                if @data["#{$1}#{$2}"].nan?
+                    @data["#{$1}#{$2}"] = 'NA'
+                end
+            else
+                abort "your missing your method named #{m}, you should go find it\n"
+            end
         end
     end
 end # class BGdist
@@ -142,10 +190,11 @@ when 'help'
     Utils::print_usage
     exit 0
 when 'metadata'
+    outfile = ARGV.shift
     clas = Object.const_get ARGV.shift.capitalize
     params = []
     ARGV.shift.gsub(/([^,]+)/){ |p| params << p }
-    DataFile::format = params
+    DataFile::format params, (File.open outfile, 'w')
 else
     puts 'unknown directive'
 end

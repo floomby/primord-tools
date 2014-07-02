@@ -133,8 +133,7 @@ rcode += <<EOF
         print_log("fitting multi frequency", w)
     }, error = function(e) {
         print_log("fitting multi frequency", e)
-    }, finally = {
-    })
+    }, finally = {})
 EOF
             else # single frequency
 rcode += <<EOF
@@ -151,15 +150,15 @@ EOF
             # rinruby does not support the logical type, thus we use NaN which is a double
 rcode += <<EOF
     if (typeof(mod.sf) == "list") {
-        mod.sf_aic = AIC(mod.sf)
-        mod.sf_intercept = mod.sf$intercept
+        mod.sf_aic = as.double(AIC(mod.sf))
+        mod.sf_intercept = mod.sf$coefficients$count[1]
     } else {
         mod.sf_aic = NaN
         mod.sf_intercept = NaN
     }
     if (typeof(mod.mf) == "list") {
-        mod.mf_aic = AIC(mod.mf)
-        mod.mf_intercept = mod.mf$intercept
+        mod.mf_aic = as.double(AIC(mod.mf))
+        mod.mf_intercept = mod.mf$coefficients$count[1]
     } else {
         mod.mf_aic = NaN
         mod.mf_intercept = NaN

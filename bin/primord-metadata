@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-# TODO write to output file
+# TODO proper option parsing
 
 # Wonky bug in rinruby (see http://hfeild-software.blogspot.com/2013/01/rinruby-woes.html)
 # I will send a PR to get it fixed sometime in the future
@@ -126,6 +126,7 @@ rcode += <<EOF
     }, error = function(e) {
         print_log("fitting single frequency", e)
     }, finally = {})
+    mod.sf_count = sum(D$N_avg_amp_sf)
     
     mod.mf <- tryCatch({
         zeroinfl(D$N_avg_amp_mf ~ bin, data=D, dist="poisson")
@@ -134,6 +135,7 @@ rcode += <<EOF
     }, error = function(e) {
         print_log("fitting multi frequency", e)
     }, finally = {})
+    mod.mf_count = sum(D$N_avg_amp_mf)
 EOF
             else # single frequency
 rcode += <<EOF
@@ -144,7 +146,10 @@ rcode += <<EOF
     }, error = function(e) {
         print_log("fitting single frequency", e)
     }, finally = {})
+    mod.sf_count = sum(D$N_avg_amp)
+    
     mod.mf = NA
+    mod.mf_count = as.integer(0)
 EOF
             end # end of single or multifrequency block
             # rinruby does not support the logical type, thus we use NaN which is a double
@@ -171,7 +176,7 @@ EOF
         def self.method_missing m, *args, &block
             if m =~ /^data_(stat_)(.*)/
                 @data["#{$1}#{$2}"] = @@R.send "mod.#{$2}"
-                if @data["#{$1}#{$2}"].nan?
+                if @data["#{$1}#{$2}"].respond_to? :nan? and @data["#{$1}#{$2}"].nan?
                     @data["#{$1}#{$2}"] = 'NA'
                 end
             else

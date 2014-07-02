@@ -15,7 +15,6 @@ Supported directives are
  * `metadata` - generate metadata
  * `help` - print help message
 
-
 Metadata
 --------
 
@@ -60,7 +59,8 @@ logging the data, signals below a threshold were not logged. This makes computin
 the poisson PDF for the data slightly more chalenging. The method that is employed
 is a zero inflated GLM using a logarithmic link function. 
 
-
-
+In many cases the model fails due to the following reasons
+ * insuficient data - if there is only signals in a couple of bins the optimization fails
+ * other wierd/unkonwn issues - I am investegating other sourced of failures
 
 

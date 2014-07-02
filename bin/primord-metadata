@@ -1,28 +1,22 @@
 #!/usr/bin/env ruby
 
 # TODO proper option parsing
+# TODO this thing is turning into a beast
+#  - split into multiple files
+#  - modulize the code 
 
 # Wonky bug in rinruby (see http://hfeild-software.blogspot.com/2013/01/rinruby-woes.html)
 # I will send a PR to get it fixed sometime in the future
-
 R = ""
 
-module Utils
-    def self.print_usage
-        puts "primord-metadata <directive> ...\n\tSee https://github.com/floomby/primord-tools for more info"
-    end
-    # get date the file was created from the filename
-    def self.extract_date str
-        a = str.match /.*([0-9]{4})([0-9]{2})([0-9]{2})/
-        "#{a[2]}-#{a[3]}-#{a[1]}"
-    end
-end # class Utils
+# TODO fix this in the Rakefile
+$:.unshift File.dirname(__FILE__) + '/../lib/'
+require 'utils'
 
 # classes for each type of file we want to work with
 class DataFile
     @@params
     @@outfile
-    @@logfile
     def initialize filename
         @filename = filename
         @data = {}
@@ -95,7 +89,6 @@ end # class Pylog
 class Bgdist < DataFile
     def initialize filename
         super
-        
         def self.data_has_multi
             if @lines[0] =~ /bin,avg_amp,N_avg_amp,,freq,N_freq/
                 @data['has_multi'] = false
@@ -105,7 +98,6 @@ class Bgdist < DataFile
                 abort "\nerror in comprehending bgdist header: #{@lines[0]}\n"
             end
         end
-        
         if @@do_stats
 rcode = <<EOF
     print_log <- function (what, msg)
@@ -171,7 +163,6 @@ rcode += <<EOF
 EOF
             @@R.eval rcode
         end
-        
         # ruby metaprograming :P
         def self.method_missing m, *args, &block
             if m =~ /^data_(stat_)(.*)/
@@ -186,8 +177,9 @@ EOF
     end
 end # class BGdist
 
-# main
 
+
+# main
 directive = ARGV.shift
 case directive
 when 'help'
@@ -199,6 +191,12 @@ when 'metadata'
     params = []
     ARGV.shift.gsub(/([^,]+)/){ |p| params << p }
     DataFile::format params, (File.open outfile, 'w')
+# This is the supper fancy option that I will work on this weekend
+# I want to create a one page web app that is centered on a timeline
+# 
+when 'timeserve'
+    
+    
 else
     puts 'unknown directive'
 end

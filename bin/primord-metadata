@@ -195,8 +195,7 @@ when 'metadata'
 # I want to create a one page web app that is centered on a timeline
 # 
 when 'timeserve'
-    
-    
+    puts 'not suported yet (prototype not merged)'    
 else
     puts 'unknown directive'
 end

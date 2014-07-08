@@ -11,9 +11,9 @@ module Parsers
             @bg_entries = []
             
             def self.background col_names
-                entries = []
+                freqs = []
                 while !(@lines[@line_idx] =~ /^ *$/) do
-                    entries << Hash[col_names.zip (@lines[@line_idx].scan /[^ ]+/).map { |x| x.to_f }]
+                    freqs << Hash[col_names.zip (@lines[@line_idx].scan /[^ ]+/).map { |x| x.to_f }]
                     @line_idx += 1
                 end
                 
@@ -21,7 +21,7 @@ module Parsers
                 until (a = @lines[@line_idx].match /[a-zA-Z ]+:(.*)/) do
                     @line_idx += 1
                 end
-                @bg_entries << { time: (DateTime.parse a[1]), entries: entries }
+                @bg_entries << { time: (DateTime.parse a[1]), freqs: freqs }
             end
             
             while @line_idx < @lines.length
@@ -33,7 +33,7 @@ module Parsers
                 @line_idx += 1
             end
             
-            pp @bg_entries
+            #pp @bg_entries
         end
     end # class Pylog
 end # module Parsers

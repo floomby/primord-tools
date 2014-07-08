@@ -3,3 +3,4 @@
 # that is a symlink to the actual data
 /stuff
 .R*
+tester.rb

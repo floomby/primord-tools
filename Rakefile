@@ -13,7 +13,7 @@ spec = Gem::Specification.new do |gem|
     gem.summary      = "Creates metadata for primord rf data"
     gem.description  = "Process the logs from gnuradio and generates metadata"
     
-    gem.files        = `git ls-files | grep -E '^tmp' -v`.split($\)
+    gem.files        = `git ls-files | grep -E '(^tmp)|(^scripts)' -v`.split($\)
     
     gem.executables  = ["primord-metadata"]
 end

@@ -13,7 +13,8 @@ module Analyzers
     class Pylog < Analyzer
         def initialize parsed, todo
             super
-            
+
+            @freq_spikes = []
             def self.freq_spikes
                 @parsed.bg_entries.each do |entry|
                     x = entry[:freqs].collect { |h| h['average'] }
@@ -26,11 +27,12 @@ module Analyzers
                     x.each_with_index do |pt, idx|
                         p = Distribution::Normal.pdf (pt - m)/s
                         if p < THRESHOLD
-                            puts y[idx]
+                            @freq_spikes << { date: entry[:date], freq: y[idx] }
                         end
                     end
-                    puts ""
                 end
+                
+                @freq_spikes
             end
             
             

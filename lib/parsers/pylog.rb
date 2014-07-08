@@ -21,7 +21,7 @@ module Parsers
                 until (a = @lines[@line_idx].match /[a-zA-Z ]+:(.*)/) do
                     @line_idx += 1
                 end
-                @bg_entries << { time: (DateTime.parse a[1]), freqs: freqs }
+                @bg_entries << { date: (DateTime.parse a[1]), freqs: freqs }
             end
             
             while @line_idx < @lines.length

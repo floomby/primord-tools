@@ -1,0 +1,35 @@
+rect.pane {
+    fill: none;
+    pointer-events: all;
+}
+
+path.area {
+    fill: lightsteelblue;
+    fill-opacity: 0.4;
+    stroke-width: 0;
+}
+
+circle.datapoint {
+    fill-opacity: 0.3;
+}
+
+circle.datapoint:hover {
+    fill-opacity: 0.9;
+}
+
+line.sep {
+    stroke: black;
+    shape-rendering: crispEdges;
+}
+
+.axis path,
+.axis line {
+    fill: none;
+    stroke: black;
+    shape-rendering: crispEdges;
+}
+
+.axis text {
+    font-family: sans-serif;
+    font-size: 11px;
+}

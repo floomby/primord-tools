@@ -1,3 +1,16 @@
+Now that the visualizer is merged in everything is a total mess
+
+There are realy only three types of files I should be pulling data from
+ * log
+ * pylog
+ * pyerr
+
+This is because the background distribution was generated from the logs,
+just prior to my time on this project.
+
+
+
+
 Main part
  * a good README
  * a better help message

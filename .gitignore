@@ -7,3 +7,4 @@ tester.rb
 *.csv
 /www/data
 /www/tmp
+*.pdf

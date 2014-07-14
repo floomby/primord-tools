@@ -16,8 +16,8 @@ class Optimize
         @d = d
         @at = start
         
-        @at.collect! { |x| x.to_i }
-        @deltas.collect! { |x| x.to_i }
+        @at.collect! { |x| x.to_f }
+        @deltas.collect! { |x| x.to_f }
 
         def self.sqrd *args
             ( (@over.collect {|x| ((args[0].call x) - (args[1].call x)) ** 2 }).reduce :+ )
@@ -37,19 +37,20 @@ class Optimize
                 @@dirs.each { |k| if v[k] < v[[0,0]]; m = k; break; end }
                 (0..1).each { |i| @at[i] += @deltas[i] * m[i] }
                 if @at[1].to_i <= 0; raise 'failed to converge' end
+                #pp @at
             end
         end
         
         
-        2.times do
-            do_itr
-            @deltas.collect! { |x| x / 2 }
-        end
+        #2.times do
+        #    do_itr
+        #    @deltas.collect! { |x| x / 2 }
+        #end
+        #
+        #@at.collect! { |x| x.to_f }
+        #@deltas.collect! { |x| x.to_f }
         
-        @at.collect! { |x| x.to_f }
-        @deltas.collect! { |x| x.to_f }
-        
-        3.times do
+        5.times do
             do_itr
             @deltas.collect! { |x| x / 2 }
         end
@@ -69,6 +70,8 @@ module Analyzers
             
             @distr = {}
             @distr[:thr] = @parsed.data['avg_amp_sf'][@thr] || 'NA'
+            @distr[:lambda] = 'NA'
+            @distr[:scale] = 'NA'
             def self.dist
                 if (@parsed.data['N_avg_amp_sf'].reduce :+) < 10
                     $stderr.puts "#{@parsed.filename}: failed to converge"
@@ -80,15 +83,15 @@ module Analyzers
                 d = lambda { |k| v = @parsed.data['N_avg_amp_sf'][k]; v }
                 begin
                     a = Optimize.new p, d, (0..@parsed.data['N_avg_amp_sf'].length - 1),
-                        [5, 1000 * Math.log(@parsed.data['N_avg_amp_sf'].reduce :+)],
-                        [1, 10 + 50 * Math.log((@parsed.data['N_avg_amp_sf'].reduce :+) * 2)]
+                        [5, 1000 + (@parsed.data['N_avg_amp_sf'].reduce :+) ** 0.5],
+                        [1, (@parsed.data['N_avg_amp_sf'].reduce :+)]
                 rescue StandardError => e
                     $stderr.puts "#{@parsed.filename}: failed to converge"
                     @distr[:mu] = 'NA'
                     return @distr
                 end
-                #@distr[:lambda] = a.at[0]
-                #@distr[:scale] = a.at[1]
+                @distr[:lambda] = a.at[0]
+                @distr[:scale] = a.at[1]
                 @distr[:mu] = a.at[0] * a.at[1] / (@parsed.data['avg_amp_sf'][1] - @parsed.data['avg_amp_sf'][0])
                 @distr
             end

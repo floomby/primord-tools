@@ -1,4 +1,4 @@
-require 'analyzers.rb'
+require 'analyzers'
 require 'pp'
 
 # supported analysis

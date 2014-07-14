@@ -17,4 +17,5 @@ ARGV.each do |fn|
     a = Analyzers::Bgdist.new p, {}
     v = a.dist
     puts "#{p.filename},#{v[:mu]},#{v[:thr]}"
+    $stdout.flush
 end

@@ -7,25 +7,25 @@ end # class Fixnum
 
 class Optimize
     attr_reader :at
+    @@dirs = (-1..1).to_a.product (-1..1).to_a
+    
     def initialize p, d, over, start, deltas
         @deltas = deltas
         @over = over
         @p = p
         @d = d
         @at = start
-
+        
         @at.collect! { |x| x.to_i }
         @deltas.collect! { |x| x.to_i }
-        #@dyn_prog = {}
-        
+
         def self.sqrd *args
-            #@dyn_prog[args] ||= ( (@over.collect {|x| ((args[0].call x) - (args[1].call x)) ** 2 }).reduce :+ )
             ( (@over.collect {|x| ((args[0].call x) - (args[1].call x)) ** 2 }).reduce :+ )
         end
         
         def self.estimate_grad at
             vals = {}
-            ((-1..1).to_a.product (-1..1).to_a).each { |x| vals[x] = sqrd lambda { |t| @p.call at[0] + x[0] * @deltas[0], at[1] + x[1] * @deltas[1], t }, @d }
+            @@dirs.each { |x| vals[x] = sqrd (@p.curry[at[0] + x[0] * @deltas[0]][at[1] + x[1] * @deltas[1]]), @d }
             vals
         end
 
@@ -34,19 +34,22 @@ class Optimize
             while m != [0, 0]
                 m = [0, 0]
                 v = estimate_grad @at
-                ((-1..1).to_a.product (-1..1).to_a).each { |k| a = v[[0,0]]; if v[k] < a; a = v[k]; m = k; end }
-                @at.each_with_index { |a, i| @at[i] = a + @deltas[i] * m[i] }
+                @@dirs.each { |k| if v[k] < v[[0,0]]; m = k; break; end }
+                (0..1).each { |i| @at[i] += @deltas[i] * m[i] }
                 if @at[1].to_i <= 0; raise 'failed to converge' end
             end
         end
         
-        do_itr
+        
+        2.times do
+            do_itr
+            @deltas.collect! { |x| x / 2 }
+        end
         
         @at.collect! { |x| x.to_f }
         @deltas.collect! { |x| x.to_f }
-
         
-        5.times do
+        3.times do
             do_itr
             @deltas.collect! { |x| x / 2 }
         end
@@ -60,16 +63,16 @@ module Analyzers
             
             @thr = 0
             idx = 0
-            while @parsed.data['N_avg_amp_sf'][@thr] < 0.5
+            while !@parsed.data['N_avg_amp_sf'][@thr].nil? and @parsed.data['N_avg_amp_sf'][@thr] < 0.5
                 @thr += 1
             end
             
             @distr = {}
-            @distr[:thr] = @parsed.data['avg_amp_sf'][@thr]
+            @distr[:thr] = @parsed.data['avg_amp_sf'][@thr] || 'NA'
             def self.dist
                 if (@parsed.data['N_avg_amp_sf'].reduce :+) < 10
                     $stderr.puts "#{@parsed.filename}: failed to converge"
-                    @distr[:mu] = NA
+                    @distr[:mu] = 'NA'
                     return @distr
                 end
                 
@@ -81,12 +84,12 @@ module Analyzers
                         [1, 10 + 50 * Math.log((@parsed.data['N_avg_amp_sf'].reduce :+) * 2)]
                 rescue StandardError => e
                     $stderr.puts "#{@parsed.filename}: failed to converge"
-                    @distr[:mu] = NA
+                    @distr[:mu] = 'NA'
                     return @distr
                 end
                 #@distr[:lambda] = a.at[0]
                 #@distr[:scale] = a.at[1]
-                @distr[:mu] = (a.at.reduce :*)/(@parsed.data['avg_amp_sf'][0..1].reverse.reduce :-)
+                @distr[:mu] = a.at[0] * a.at[1] / (@parsed.data['avg_amp_sf'][1] - @parsed.data['avg_amp_sf'][0])
                 @distr
             end
         end
